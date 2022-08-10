@@ -1,0 +1,60 @@
+name: Create and publish a Docker image
+
+on:
+  push:
+    branches: deploy
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: login to ghcr
+        run: echo ${{ secrets.GITKEY_PACKAGE }}  | docker login ghcr.io -u $USERNAME --password-stdin
+        env:
+          USERNAME: ayush-sriva
+          CR_PAT: ${{ secrets.GITKEY_PACKAGE }} 
+
+# -------------  UI ---------------------
+        
+      - name: Docker Build UI
+        run: docker build . -t ghcr.io/ayush-sriva/bc-44-ui -f ui_node.dockerfile
+        working-directory: ./green-commute/
+
+      - name: push UI image
+        run: docker push ghcr.io/ayush-sriva/bc-44-ui
+
+  Deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+
+    - name: Add SSH key
+      env:
+          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+      run: |
+          mkdir -p /home/runner/.ssh
+          echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+          echo -e "${{ secrets.PVT_KEY }}" > /home/runner/.ssh/github_actions
+          chmod 600 /home/runner/.ssh/github_actions
+          ssh-agent -a $SSH_AUTH_SOCK > /dev/null   
+          ssh-add /home/runner/.ssh/github_actions
+    
+    - uses: actions/checkout@master
+    - name: copy file via ssh password
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.INSTANCE_IP }}
+        username: ubuntu
+        key: ${{ secrets.PVT_KEY }}
+        source: "deployment/docker-compose.yaml"
+        target: "."
+
+    - name: Deploy
+      env:
+          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+      run: |
+          ssh ubuntu@${{ secrets.INSTANCE_IP }} -i ~/.ssh/github_actions "sudo docker login ghcr.io -u ayush-sriva --password ${{ secrets.GITKEY_PACKAGE }};sudo docker-compose -f ./deployment/docker-compose.yaml down;sudo docker system prune --all --force;sudo docker-compose -f ./deployment/docker-compose.yaml up -d"
