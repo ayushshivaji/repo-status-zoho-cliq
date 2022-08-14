@@ -2,8 +2,8 @@
 
 USER=ayush-sriva@github
 PROJECT=sonar-test-ayush
-SONAR_TOKEN=629a67cf6be30d0037d1f1c1d9bb40169c64600b
-ZOHO_TOKEN=1000.eccbdecc709471c946088d1e38643319.a6bc43f6ab38eb735ff058508f333af2
+SONAR_TOKEN=${{ secrets.SONAR_TOKEN }}
+ZOHO_TOKEN=${{ secrets.ZOHO_TOKEN }}
 RATING=$(curl -u $SONAR_TOKEN: "https://sonarcloud.io/api/measures/component?component=sonar-test-ayush&metricKeys=reliability_rating" | jq '.["component"]["measures"][0]["value"]')
 
 cliq (){
